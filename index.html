@@ -169,7 +169,7 @@
               <div className="p-5 space-y-5">
                 <div className="space-y-1">
                   <label className="block text-sm font-medium text-slate-600">病院・医療機関名 (任意)</label>
-                  <div className="relative">
+                  <div className="flex items-center relative">
                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
                       <Building2 size={18} />
                     </div>
@@ -178,14 +178,14 @@
                       value={hospitalName}
                       onChange={(e) => setHospitalName(e.target.value)}
                       placeholder="例: A病院、近所のクリニック"
-                      className="w-full pl-10 pr-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition-colors"
+                      className="flex-1 w-full pl-10 pr-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition-colors"
                     />
                   </div>
                 </div>
 
                 <div className="space-y-1">
                   <label className="block text-sm font-medium text-slate-600">内服を開始する日</label>
-                  <div className="relative">
+                  <div className="flex items-center relative">
                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
                       <CalendarIcon size={18} />
                     </div>
@@ -193,15 +193,15 @@
                       type="date"
                       value={startDate}
                       onChange={(e) => setStartDate(e.target.value)}
-                      className="w-full pl-10 pr-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition-colors"
+                      className="flex-1 w-full pl-10 pr-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition-colors"
                     />
                   </div>
                 </div>
 
                 <div className="space-y-1">
                   <label className="block text-sm font-medium text-slate-600">処方日数 (何日分か)</label>
-                  <div className="relative flex items-center gap-2">
-                    <div className="relative flex-1">
+                  <div className="flex items-center gap-2">
+                    <div className="flex items-center relative flex-1">
                       <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
                         <CalendarDays size={18} />
                       </div>
@@ -210,7 +210,7 @@
                         min="1"
                         value={days}
                         onChange={(e) => setDays(parseInt(e.target.value) || '')}
-                        className="w-full pl-10 pr-8 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition-colors text-lg font-medium"
+                        className="flex-1 w-full pl-10 pr-8 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition-colors text-lg font-medium"
                       />
                       <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none text-slate-500">
                         日分
