@@ -37,6 +37,7 @@
     const Clock = ({ size = 24, className = "" }) => <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>;
     const Copy = ({ size = 24, className = "" }) => <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>;
     const Check = ({ size = 24, className = "" }) => <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><polyline points="20 6 9 17 4 12"/></svg>;
+    const AlertTriangle = ({ size = 24, className = "" }) => <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>;
 
     // ユーティリティ関数：今日の日付を YYYY-MM-DD 形式で取得
     const getTodayStr = () => {
@@ -75,6 +76,15 @@
       return `${date.getFullYear()}/${date.getMonth() + 1}/${date.getDate()}`;
     };
 
+    // ユーティリティ関数：コピー用の曜日付き日付フォーマット (例: 2026/7/4（土）)
+    const formatShortDateWithDay = (dateString) => {
+      if (!dateString) return '';
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) return '';
+      const days = ['日', '月', '火', '水', '木', '金', '土'];
+      return `${date.getFullYear()}/${date.getMonth() + 1}/${date.getDate()}（${days[date.getDay()]}）`;
+    };
+
     // 飲むタイミングのマスターデータ
     const TIMING_OPTIONS = [
       { id: 'morning', label: '朝' },
@@ -87,6 +97,7 @@
     function App() {
       const [hospitalName, setHospitalName] = useState('');
       const [startDate, setStartDate] = useState(getTodayStr());
+      const [nextVisitDate, setNextVisitDate] = useState(''); // D案：受診日
       
       // 服用タイミング関連のステート
       const [timings, setTimings] = useState([]);
@@ -177,6 +188,43 @@
         return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
       };
 
+      // D案：受診日からの逆算（過不足の計算）
+      const getVisitStatus = (end, visit) => {
+        if (!end || !visit) return null;
+        const endObj = new Date(end);
+        const visitObj = new Date(visit);
+        const diff = Math.ceil((endObj - visitObj) / (1000 * 60 * 60 * 24));
+        
+        if (diff < 0) {
+          return {
+            status: 'shortage',
+            message: `${Math.abs(diff)}日分 足りません`,
+            bg: 'bg-red-50',
+            border: 'border-red-200',
+            text: 'text-red-700',
+            icon: <AlertTriangle size={18} />
+          };
+        } else if (diff === 0) {
+          return {
+            status: 'exact',
+            message: 'ぴったり足ります',
+            bg: 'bg-green-50',
+            border: 'border-green-200',
+            text: 'text-green-700',
+            icon: <Check size={18} />
+          };
+        } else {
+          return {
+            status: 'surplus',
+            message: `${diff}日分 余ります`,
+            bg: 'bg-teal-50',
+            border: 'border-teal-200',
+            text: 'text-teal-700',
+            icon: <Info size={18} />
+          };
+        }
+      };
+
       // 計算結果を履歴に保存
       const handleSave = () => {
         if (!startDate || !days || days <= 0 || !endDate) return;
@@ -189,11 +237,13 @@
           endDate,
           startTiming,
           endTiming,
-          timings
+          timings,
+          nextVisitDate // D案：受診日も保存
         };
 
         setRecords([newRecord, ...records]);
         setHospitalName('');
+        // 連続入力を考慮し、受診日・開始日・日数はあえてクリアしません
       };
 
       // 履歴の削除
@@ -210,7 +260,7 @@
         
         records.forEach(record => {
           const hName = record.name;
-          const eDate = formatShortDate(record.endDate);
+          const eDate = formatShortDateWithDay(record.endDate);
           const eTimeStr = record.endTiming ? ` ${getTimingLabel(record.endTiming)}` : '';
           
           // 現在の残り日数をテキストに含める
@@ -220,7 +270,20 @@
           else if (diffDays === 0) remainStr = '今日まで';
           else remainStr = `あと ${diffDays} 日`;
           
-          copyText += `・${hName}からの処方 ： ${eDate}${eTimeStr}まで（${remainStr}）\n`;
+          // D案：受診日が設定されている場合は過不足を追記
+          let visitStr = '';
+          if (record.nextVisitDate) {
+            const vStatus = getVisitStatus(record.endDate, record.nextVisitDate);
+            if (vStatus.status === 'shortage') {
+              visitStr = ` ※受診日(${formatShortDate(record.nextVisitDate)})に対し${Math.abs(getRemainingDaysNum(record.endDate) - getRemainingDaysNum(record.nextVisitDate))}日不足`;
+            } else if (vStatus.status === 'surplus') {
+              visitStr = ` ※受診日(${formatShortDate(record.nextVisitDate)})に対し余裕あり`;
+            } else {
+              visitStr = ` ※受診日(${formatShortDate(record.nextVisitDate)})までぴったり`;
+            }
+          }
+          
+          copyText += `・${hName}からの処方 ： ${eDate}${eTimeStr}まで（${remainStr}）${visitStr}\n`;
         });
 
         try {
@@ -410,31 +473,62 @@
                   </div>
                 </div>
 
+                {/* D案：次回受診日入力 */}
+                <div className="space-y-1 border-t border-slate-100 pt-3">
+                  <label className="block text-sm font-medium text-slate-600">次回受診日 (任意・薬が足りるか確認)</label>
+                  <div className="flex items-center relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                      <Building2 size={18} />
+                    </div>
+                    <input
+                      type="date"
+                      value={nextVisitDate}
+                      onChange={(e) => setNextVisitDate(e.target.value)}
+                      className="flex-1 w-full pl-10 pr-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition-colors text-base"
+                    />
+                  </div>
+                </div>
+
                 {/* 計算結果 */}
-                <div className="mt-6 p-4 bg-gradient-to-br from-teal-500 to-teal-600 rounded-xl text-white shadow-inner min-h-[120px] flex flex-col justify-center">
-                  <p className="text-teal-100 text-sm mb-1 flex items-center gap-1">
-                    <Info size={14} />
-                    内服終了日（この日までお薬があります）
-                  </p>
-                  <div className="text-2xl font-bold text-center py-2 flex flex-col items-center justify-center gap-1">
-                    {endDate && days > 0 ? (
-                      <>
-                        <span>{formatDateJP(endDate)}</span>
-                        {endTiming && (
-                          <span className="text-xl bg-teal-700/50 px-3 py-1 rounded-full text-teal-50 mt-1">
-                            {getTimingLabel(endTiming)} まで
-                          </span>
-                        )}
-                      </>
-                    ) : (
-                      <span className="opacity-50">---</span>
+                <div className="mt-6">
+                  <div className="p-4 bg-gradient-to-br from-teal-500 to-teal-600 rounded-xl text-white shadow-inner min-h-[120px] flex flex-col justify-center">
+                    <p className="text-teal-100 text-sm mb-1 flex items-center gap-1">
+                      <Info size={14} />
+                      内服終了日（この日までお薬があります）
+                    </p>
+                    <div className="text-2xl font-bold text-center py-2 flex flex-col items-center justify-center gap-1">
+                      {endDate && days > 0 ? (
+                        <>
+                          <span>{formatDateJP(endDate)}</span>
+                          {endTiming && (
+                            <span className="text-xl bg-teal-700/50 px-3 py-1 rounded-full text-teal-50 mt-1">
+                              {getTimingLabel(endTiming)} まで
+                            </span>
+                          )}
+                        </>
+                      ) : (
+                        <span className="opacity-50">---</span>
+                      )}
+                    </div>
+                    {endDate && startDate && days > 0 && (
+                      <p className="text-center text-teal-100 text-sm mt-2 opacity-90">
+                        ({formatDateJP(startDate)} {startTiming ? getTimingLabel(startTiming) + 'から' : ''} {days} 日間)
+                      </p>
                     )}
                   </div>
-                  {endDate && startDate && days > 0 && (
-                    <p className="text-center text-teal-100 text-sm mt-2 opacity-90">
-                      ({formatDateJP(startDate)} {startTiming ? getTimingLabel(startTiming) + 'から' : ''} {days} 日間)
-                    </p>
-                  )}
+                  
+                  {/* D案：受診日からの逆算表示 */}
+                  {nextVisitDate && endDate && days > 0 && (() => {
+                    const status = getVisitStatus(endDate, nextVisitDate);
+                    return (
+                      <div className={`mt-3 p-3 rounded-xl border ${status.bg} ${status.border} shadow-sm`}>
+                        <p className={`text-sm font-bold flex items-center justify-center gap-1.5 ${status.text}`}>
+                          {status.icon}
+                          受診日({formatShortDate(nextVisitDate)})に対し：{status.message}
+                        </p>
+                      </div>
+                    );
+                  })()}
                 </div>
 
                 <button
@@ -534,25 +628,42 @@
                           </div>
                         </div>
                         
-                        <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-100 flex items-center justify-between">
-                          <div>
-                            <span className="text-slate-400 text-xs block mb-0.5">終了日 (ここまで)</span>
-                            <div className={`font-semibold flex items-center gap-1.5 ${isFinished ? 'text-slate-500' : 'text-teal-700'}`}>
-                              {formatDateJP(record.endDate)}
-                              {record.endTiming && (
-                                <span className={`text-xs px-1.5 py-0.5 border rounded ${isFinished ? 'bg-slate-100 border-slate-200' : 'bg-teal-50 border-teal-200'}`}>
-                                  {getTimingLabel(record.endTiming)}まで
-                                </span>
-                              )}
+                        <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-100 flex flex-col gap-2">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <span className="text-slate-400 text-xs block mb-0.5">終了日 (ここまで)</span>
+                              <div className={`font-semibold flex items-center gap-1.5 ${isFinished ? 'text-slate-500' : 'text-teal-700'}`}>
+                                {formatDateJP(record.endDate)}
+                                {record.endTiming && (
+                                  <span className={`text-xs px-1.5 py-0.5 border rounded ${isFinished ? 'bg-slate-100 border-slate-200' : 'bg-teal-50 border-teal-200'}`}>
+                                    {getTimingLabel(record.endTiming)}まで
+                                  </span>
+                                )}
+                              </div>
                             </div>
+                            <button
+                              onClick={() => handleDelete(record.id)}
+                              className="p-2 text-slate-400 hover:text-red-500 transition-colors rounded-full hover:bg-red-50"
+                              title="削除"
+                            >
+                              <Trash2 size={18} />
+                            </button>
                           </div>
-                          <button
-                            onClick={() => handleDelete(record.id)}
-                            className="p-2 text-slate-400 hover:text-red-500 transition-colors rounded-full hover:bg-red-50"
-                            title="削除"
-                          >
-                            <Trash2 size={18} />
-                          </button>
+                          
+                          {/* D案：履歴にも受診日ステータスを表示 */}
+                          {record.nextVisitDate && (() => {
+                            const vStatus = getVisitStatus(record.endDate, record.nextVisitDate);
+                            return (
+                              <div className={`mt-1 p-2 rounded text-xs border flex items-center justify-between ${vStatus.bg} ${vStatus.border} ${vStatus.text}`}>
+                                <span className="flex items-center gap-1 opacity-90">
+                                  <CalendarIcon size={12} /> 受診予定: {formatShortDate(record.nextVisitDate)}
+                                </span>
+                                <span className="font-bold flex items-center gap-1">
+                                  {vStatus.icon} {vStatus.message}
+                                </span>
+                              </div>
+                            );
+                          })()}
                         </div>
                       </div>
                     );
@@ -575,8 +686,21 @@
                       if (diffDays < 0) remainStr = '服用終了';
                       else if (diffDays === 0) remainStr = '今日まで';
                       else remainStr = `あと ${diffDays} 日`;
+
+                      // D案：テキストにも不足情報を反映
+                      let visitStr = '';
+                      if (record.nextVisitDate) {
+                        const vStatus = getVisitStatus(record.endDate, record.nextVisitDate);
+                        if (vStatus.status === 'shortage') {
+                          visitStr = ` ※受診日(${formatShortDate(record.nextVisitDate)})に対し${Math.abs(getRemainingDaysNum(record.endDate) - getRemainingDaysNum(record.nextVisitDate))}日不足`;
+                        } else if (vStatus.status === 'surplus') {
+                          visitStr = ` ※受診日(${formatShortDate(record.nextVisitDate)})に対し余裕あり`;
+                        } else {
+                          visitStr = ` ※受診日(${formatShortDate(record.nextVisitDate)})までぴったり`;
+                        }
+                      }
                       
-                      return `・${record.name}からの処方 ： ${formatShortDate(record.endDate)}${eTimeStr}まで（${remainStr}）\n`;
+                      return `・${record.name}からの処方 ： ${formatShortDateWithDay(record.endDate)}${eTimeStr}まで（${remainStr}）${visitStr}\n`;
                     })}
                   </div>
                 </div>
