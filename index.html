@@ -158,9 +158,22 @@
         }
       }, [startDate, days, timings, startTiming]);
 
+      // 残り日数の計算（今日を基準に）
+      const calculateRemainingDays = (end) => {
+        if (!end) return '';
+        const today = new Date(getTodayStr());
+        const endDateObj = new Date(end);
+        const diffTime = endDateObj - today;
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        
+        if (diffDays < 0) return '服用終了';
+        if (diffDays === 0) return '今日まで';
+        return `あと ${diffDays} 日`;
+      };
+
       // 計算結果を履歴に保存
       const handleSave = () => {
-        if (!startDate || days <= 0 || !endDate) return;
+        if (!startDate || !days || days <= 0 || !endDate) return;
 
         const newRecord = {
           id: Date.now().toString(),
@@ -186,7 +199,9 @@
       const handleCopyText = async () => {
         if (records.length === 0) return;
 
-        let copyText = "【処方薬の終了日確認】\n";
+        // 【改善】確認日を明記
+        let copyText = `【処方薬の終了日確認】 (確認日: ${formatShortDate(getTodayStr())})\n`;
+        
         records.forEach(record => {
           const hName = record.name;
           const sDate = formatShortDate(record.startDate);
@@ -194,7 +209,11 @@
           const sTimeStr = record.startTiming ? ` ${getTimingLabel(record.startTiming)}` : '';
           const eTimeStr = record.endTiming ? ` ${getTimingLabel(record.endTiming)}` : '';
           
-          copyText += `・${hName}からの処方 (${record.days}日分)： ${sDate}${sTimeStr}開始 → ${eDate}${eTimeStr}まで\n`;
+          // 【改善】現在の残り日数をテキストに含める
+          const remaining = calculateRemainingDays(record.endDate);
+          const remainStr = remaining === '服用終了' ? '服用終了' : remaining;
+          
+          copyText += `・${hName}からの処方 (${record.days}日分)： ${sDate}${sTimeStr}開始 → ${eDate}${eTimeStr}まで（${remainStr}）\n`;
         });
 
         try {
@@ -214,18 +233,6 @@
           console.error('コピーに失敗しました', err);
           alert('コピーに失敗しました。');
         }
-      };
-
-      // 残り日数の計算（今日を基準に）
-      const calculateRemainingDays = (end) => {
-        const today = new Date(getTodayStr());
-        const endDateObj = new Date(end);
-        const diffTime = endDateObj - today;
-        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-        
-        if (diffDays < 0) return '服用終了';
-        if (diffDays === 0) return '今日まで';
-        return `あと ${diffDays} 日`;
       };
 
       return (
@@ -280,7 +287,7 @@
                   </div>
                 </div>
 
-                {/* 飲むタイミング (New) */}
+                {/* 飲むタイミング */}
                 <div className="space-y-2 pt-2 border-t border-slate-100">
                   <label className="block text-sm font-medium text-slate-600">飲むタイミング (任意・複数可)</label>
                   <div className="flex flex-wrap gap-2">
@@ -301,7 +308,7 @@
                   </div>
                 </div>
 
-                {/* 飲み始めるタイミング (New) */}
+                {/* 飲み始めるタイミング */}
                 {timings.length > 0 && (
                   <div className="space-y-2 pb-1">
                     <label className="block text-sm font-medium text-slate-600">飲み始めるタイミング</label>
@@ -324,7 +331,7 @@
                   </div>
                 )}
 
-                {/* 処方日数 (ボタン付きに改善) */}
+                {/* 処方日数 */}
                 <div className="space-y-1">
                   <label className="block text-sm font-medium text-slate-600">処方日数 (何日分か)</label>
                   <div className="flex flex-col gap-3">
@@ -346,7 +353,7 @@
                           type="number"
                           min="1"
                           value={days}
-                          onChange={(e) => setDays(parseInt(e.target.value) || '')}
+                          onChange={(e) => setDays(e.target.value === '' ? '' : Math.max(1, parseInt(e.target.value) || 1))}
                           className="w-full pl-10 pr-8 py-3 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition-colors text-xl font-bold text-center"
                         />
                         <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none text-slate-500 font-medium">
@@ -379,22 +386,24 @@
                 </div>
 
                 {/* 計算結果 */}
-                <div className="mt-6 p-4 bg-gradient-to-br from-teal-500 to-teal-600 rounded-xl text-white shadow-inner">
+                <div className="mt-6 p-4 bg-gradient-to-br from-teal-500 to-teal-600 rounded-xl text-white shadow-inner min-h-[120px] flex flex-col justify-center">
                   <p className="text-teal-100 text-sm mb-1 flex items-center gap-1">
                     <Info size={14} />
                     内服終了日（この日までお薬があります）
                   </p>
                   <div className="text-2xl font-bold text-center py-2 flex flex-col items-center justify-center gap-1">
-                    {endDate ? (
+                    {endDate && days > 0 ? (
                       <>
                         <span>{formatDateJP(endDate)}</span>
                         {endTiming && (
-                          <span className="text-xl bg-teal-700/50 px-3 py-1 rounded-full text-teal-50">
+                          <span className="text-xl bg-teal-700/50 px-3 py-1 rounded-full text-teal-50 mt-1">
                             {getTimingLabel(endTiming)} まで
                           </span>
                         )}
                       </>
-                    ) : '---'}
+                    ) : (
+                      <span className="opacity-50">---</span>
+                    )}
                   </div>
                   {endDate && startDate && days > 0 && (
                     <p className="text-center text-teal-100 text-sm mt-2 opacity-90">
@@ -405,7 +414,7 @@
 
                 <button
                   onClick={handleSave}
-                  disabled={!endDate}
+                  disabled={!endDate || !days || days <= 0}
                   className="w-full py-4 bg-teal-600 hover:bg-teal-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white font-semibold rounded-xl shadow-sm transition-all flex items-center justify-center gap-2 active:scale-95 text-lg"
                 >
                   <Plus size={22} />
@@ -424,10 +433,10 @@
                   
                   <button
                     onClick={handleCopyText}
-                    className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                    className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-sm font-medium transition-colors shadow-sm ${
                       isCopied 
-                        ? 'bg-green-100 text-green-700 border border-green-200' 
-                        : 'bg-white text-slate-600 border border-slate-300 hover:bg-slate-50'
+                        ? 'bg-green-100 text-green-700 border border-green-300' 
+                        : 'bg-white text-slate-700 border border-slate-300 hover:bg-slate-50'
                     }`}
                   >
                     {isCopied ? (
@@ -436,7 +445,7 @@
                       </>
                     ) : (
                       <>
-                        <Copy size={16} /> 記録をテキストでコピー
+                        <Copy size={16} /> テキストで一括コピー
                       </>
                     )}
                   </button>
@@ -453,7 +462,7 @@
                         className={`bg-white p-4 rounded-xl shadow-sm border ${isFinished ? 'border-slate-200 opacity-60' : 'border-teal-100'} relative overflow-hidden`}
                       >
                         {!isFinished && (
-                          <div className="absolute top-0 right-0 bg-orange-100 text-orange-800 text-xs font-bold px-3 py-1 rounded-bl-lg">
+                          <div className="absolute top-0 right-0 bg-orange-100 text-orange-800 text-xs font-bold px-3 py-1 rounded-bl-lg border-b border-l border-orange-200">
                             {remaining}
                           </div>
                         )}
@@ -479,11 +488,11 @@
                           </div>
                           <div>
                             <span className="text-slate-400 text-xs block mb-0.5">処方日数</span>
-                            {record.days} 日分
+                            <span className="font-medium text-slate-700">{record.days}</span> 日分
                           </div>
                         </div>
                         
-                        <div className="bg-slate-50 p-2 rounded-lg border border-slate-100 flex items-center justify-between">
+                        <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-100 flex items-center justify-between">
                           <div>
                             <span className="text-slate-400 text-xs block mb-0.5">終了日 (ここまで)</span>
                             <div className={`font-semibold flex items-center gap-1.5 ${isFinished ? 'text-slate-500' : 'text-teal-700'}`}>
@@ -508,14 +517,20 @@
                   })}
                 </div>
                 
-                <div className="bg-slate-100 border border-slate-200 rounded-lg p-3 text-xs text-slate-500 mt-2">
-                  <p className="font-semibold mb-1">【コピーされる文章のプレビュー】</p>
-                  <div className="whitespace-pre-wrap font-mono">
-                    【処方薬の終了日確認】{'\n'}
+                {/* プレビュー表示エリアの改善 */}
+                <div className="bg-slate-800 text-slate-300 rounded-lg p-3 text-xs mt-3 shadow-inner">
+                  <div className="flex items-center gap-1 mb-2 text-slate-400">
+                    <Info size={14} />
+                    <p className="font-semibold">【コピーされるテキストの確認】</p>
+                  </div>
+                  <div className="whitespace-pre-wrap font-mono leading-relaxed pl-1 border-l-2 border-slate-600">
+                    【処方薬の終了日確認】 (確認日: {formatShortDate(getTodayStr())}){'\n'}
                     {records.map(record => {
                       const sTimeStr = record.startTiming ? ` ${getTimingLabel(record.startTiming)}` : '';
                       const eTimeStr = record.endTiming ? ` ${getTimingLabel(record.endTiming)}` : '';
-                      return `・${record.name}からの処方 (${record.days}日分)： ${formatShortDate(record.startDate)}${sTimeStr}開始 → ${formatShortDate(record.endDate)}${eTimeStr}まで\n`;
+                      const remaining = calculateRemainingDays(record.endDate);
+                      const remainStr = remaining === '服用終了' ? '服用終了' : remaining;
+                      return `・${record.name}からの処方 (${record.days}日分)： ${formatShortDate(record.startDate)}${sTimeStr}開始 → ${formatShortDate(record.endDate)}${eTimeStr}まで（${remainStr}）\n`;
                     })}
                   </div>
                 </div>
