@@ -1,329 +1,364 @@
-import React, { useState, useEffect } from 'react';
-import { Calendar as CalendarIcon, Building2, CalendarDays, Plus, Trash2, Activity, Info, Clock, Copy, Check } from 'lucide-react';
-
-// ユーティリティ関数：今日の日付を YYYY-MM-DD 形式で取得
-const getTodayStr = () => {
-  const today = new Date();
-  const yyyy = today.getFullYear();
-  const mm = String(today.getMonth() + 1).padStart(2, '0');
-  const dd = String(today.getDate()).padStart(2, '0');
-  return `${yyyy}-${mm}-${dd}`;
-};
-
-// ユーティリティ関数：日付文字列を日本語表記にフォーマット (画面表示用)
-const formatDateJP = (dateString) => {
-  if (!dateString) return '';
-  const date = new Date(dateString);
-  if (isNaN(date.getTime())) return '';
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>お薬計算ツール</title>
   
-  const days = ['日', '月', '火', '水', '木', '金', '土'];
-  return `${date.getFullYear()}年${date.getMonth() + 1}月${date.getDate()}日 (${days[date.getDay()]})`;
-};
+  <!-- デザインを整えるためのTailwind CSSを読み込み -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- React本体と、ブラウザ上でコードを動かすためのBabelを読み込み -->
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+</head>
+<body class="bg-slate-50 text-slate-800 font-sans pb-12">
+  
+  <!-- アプリが表示される場所 -->
+  <div id="root"></div>
 
-// ユーティリティ関数：コピー用のシンプルな日付フォーマット (例: 2026/7/4)
-const formatShortDate = (dateString) => {
-  if (!dateString) return '';
-  const date = new Date(dateString);
-  if (isNaN(date.getTime())) return '';
-  return `${date.getFullYear()}/${date.getMonth() + 1}/${date.getDate()}`;
-};
+  <!-- ここから下がアプリのプログラム（React） -->
+  <script type="text/babel">
+    const { useState, useEffect } = React;
 
-export default function App() {
-  const [hospitalName, setHospitalName] = useState('');
-  const [startDate, setStartDate] = useState(getTodayStr());
-  const [days, setDays] = useState(14);
-  const [endDate, setEndDate] = useState('');
-  const [records, setRecords] = useState([]);
-  const [isCopied, setIsCopied] = useState(false);
+    // --- アイコン部品（インラインSVG） ---
+    const CalendarIcon = ({ size = 24, className = "" }) => <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/></svg>;
+    const Building2 = ({ size = 24, className = "" }) => <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z"/><path d="M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2"/><path d="M18 9h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2"/><path d="M10 6h4"/><path d="M10 10h4"/><path d="M10 14h4"/><path d="M10 18h4"/></svg>;
+    const CalendarDays = ({ size = 24, className = "" }) => <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/><path d="M8 14h.01"/><path d="M12 14h.01"/><path d="M16 14h.01"/><path d="M8 18h.01"/><path d="M12 18h.01"/><path d="M16 18h.01"/></svg>;
+    const Plus = ({ size = 24, className = "" }) => <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M5 12h14"/><path d="M12 5v14"/></svg>;
+    const Trash2 = ({ size = 24, className = "" }) => <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>;
+    const Activity = ({ size = 24, className = "" }) => <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>;
+    const Info = ({ size = 24, className = "" }) => <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>;
+    const Clock = ({ size = 24, className = "" }) => <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>;
+    const Copy = ({ size = 24, className = "" }) => <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>;
+    const Check = ({ size = 24, className = "" }) => <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><polyline points="20 6 9 17 4 12"/></svg>;
 
-  // 入力値が変わるたびに終了日を自動計算
-  useEffect(() => {
-    if (startDate && days > 0) {
-      const start = new Date(startDate);
-      // 開始日も含めるため、日数から1を引く
-      start.setDate(start.getDate() + parseInt(days, 10) - 1);
-      
-      const yyyy = start.getFullYear();
-      const mm = String(start.getMonth() + 1).padStart(2, '0');
-      const dd = String(start.getDate()).padStart(2, '0');
-      setEndDate(`${yyyy}-${mm}-${dd}`);
-    } else {
-      setEndDate('');
-    }
-  }, [startDate, days]);
-
-  // 計算結果を履歴に保存
-  const handleSave = () => {
-    if (!startDate || days <= 0 || !endDate) return;
-
-    const newRecord = {
-      id: Date.now().toString(),
-      name: hospitalName.trim() || '病院名未入力',
-      startDate,
-      days,
-      endDate,
+    // ユーティリティ関数：今日の日付を YYYY-MM-DD 形式で取得
+    const getTodayStr = () => {
+      const today = new Date();
+      const yyyy = today.getFullYear();
+      const mm = String(today.getMonth() + 1).padStart(2, '0');
+      const dd = String(today.getDate()).padStart(2, '0');
+      return `${yyyy}-${mm}-${dd}`;
     };
 
-    setRecords([newRecord, ...records]);
-    setHospitalName('');
-    // 開始日と日数はそのまま残す（連続して入力しやすくするため）
-  };
+    // ユーティリティ関数：日付文字列を日本語表記にフォーマット (画面表示用)
+    const formatDateJP = (dateString) => {
+      if (!dateString) return '';
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) return '';
+      
+      const days = ['日', '月', '火', '水', '木', '金', '土'];
+      return `${date.getFullYear()}年${date.getMonth() + 1}月${date.getDate()}日 (${days[date.getDay()]})`;
+    };
 
-  // 履歴の削除
-  const handleDelete = (id) => {
-    setRecords(records.filter(record => record.id !== id));
-  };
+    // ユーティリティ関数：コピー用のシンプルな日付フォーマット (例: 2026/7/4)
+    const formatShortDate = (dateString) => {
+      if (!dateString) return '';
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) return '';
+      return `${date.getFullYear()}/${date.getMonth() + 1}/${date.getDate()}`;
+    };
 
-  // 記録用のテキストを一括コピー
-  const handleCopyText = async () => {
-    if (records.length === 0) return;
+    function App() {
+      const [hospitalName, setHospitalName] = useState('');
+      const [startDate, setStartDate] = useState(getTodayStr());
+      const [days, setDays] = useState(14);
+      const [endDate, setEndDate] = useState('');
+      const [records, setRecords] = useState([]);
+      const [isCopied, setIsCopied] = useState(false);
 
-    // コピー用のテキストを作成
-    let copyText = "【処方薬の終了日確認】\n";
-    records.forEach(record => {
-      const hName = record.name;
-      const sDate = formatShortDate(record.startDate);
-      const eDate = formatShortDate(record.endDate);
-      copyText += `・${hName}からの処方 (${record.days}日分)： ${sDate}開始 → ${eDate}まで\n`;
-    });
-
-    try {
-      await navigator.clipboard.writeText(copyText);
-      setIsCopied(true);
-      setTimeout(() => setIsCopied(false), 2000); // 2秒後にアイコンを戻す
-    } catch (err) {
-      console.error('コピーに失敗しました', err);
-      alert('クリップボードへのコピーに失敗しました。');
-    }
-  };
-
-  // 残り日数の計算（今日を基準に）
-  const calculateRemainingDays = (end) => {
-    const today = new Date(getTodayStr());
-    const endDateObj = new Date(end);
-    const diffTime = endDateObj - today;
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    
-    if (diffDays < 0) return '服用終了';
-    if (diffDays === 0) return '今日まで';
-    return `あと ${diffDays} 日`;
-  };
-
-  return (
-    <div className="min-h-screen bg-slate-50 text-slate-800 font-sans pb-12">
-      {/* ヘッダー */}
-      <header className="bg-teal-600 text-white p-4 shadow-md sticky top-0 z-10">
-        <div className="max-w-md mx-auto flex items-center justify-center gap-2">
-          <Activity size={24} />
-          <h1 className="text-xl font-bold tracking-wider">処方日数・終了日計算</h1>
-        </div>
-      </header>
-
-      <main className="max-w-md mx-auto p-4 space-y-6 mt-4">
-        
-        {/* メイン計算カード */}
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-          <div className="bg-teal-50 p-4 border-b border-teal-100 flex items-center gap-2 text-teal-800">
-            <Activity size={20} />
-            <h2 className="font-semibold">いつまであるか計算</h2>
-          </div>
+      // 入力値が変わるたびに終了日を自動計算
+      useEffect(() => {
+        if (startDate && days > 0) {
+          const start = new Date(startDate);
+          start.setDate(start.getDate() + parseInt(days, 10) - 1);
           
-          <div className="p-5 space-y-5">
-            {/* 病院名入力 */}
-            <div className="space-y-1">
-              <label className="block text-sm font-medium text-slate-600">病院・医療機関名 (任意)</label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
-                  <Building2 size={18} />
+          const yyyy = start.getFullYear();
+          const mm = String(start.getMonth() + 1).padStart(2, '0');
+          const dd = String(start.getDate()).padStart(2, '0');
+          setEndDate(`${yyyy}-${mm}-${dd}`);
+        } else {
+          setEndDate('');
+        }
+      }, [startDate, days]);
+
+      // 計算結果を履歴に保存
+      const handleSave = () => {
+        if (!startDate || days <= 0 || !endDate) return;
+
+        const newRecord = {
+          id: Date.now().toString(),
+          name: hospitalName.trim() || '病院名未入力',
+          startDate,
+          days,
+          endDate,
+        };
+
+        setRecords([newRecord, ...records]);
+        setHospitalName('');
+      };
+
+      // 履歴の削除
+      const handleDelete = (id) => {
+        setRecords(records.filter(record => record.id !== id));
+      };
+
+      // 記録用のテキストを一括コピー
+      const handleCopyText = async () => {
+        if (records.length === 0) return;
+
+        let copyText = "【処方薬の終了日確認】\n";
+        records.forEach(record => {
+          const hName = record.name;
+          const sDate = formatShortDate(record.startDate);
+          const eDate = formatShortDate(record.endDate);
+          copyText += `・${hName}からの処方 (${record.days}日分)： ${sDate}開始 → ${eDate}まで\n`;
+        });
+
+        // ページ埋め込み時にもコピー機能が動くように旧APIもフォールバックとして用意
+        try {
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            await navigator.clipboard.writeText(copyText);
+          } else {
+            const textArea = document.createElement("textarea");
+            textArea.value = copyText;
+            document.body.appendChild(textArea);
+            textArea.select();
+            document.execCommand("copy");
+            document.body.removeChild(textArea);
+          }
+          setIsCopied(true);
+          setTimeout(() => setIsCopied(false), 2000);
+        } catch (err) {
+          console.error('コピーに失敗しました', err);
+          alert('コピーに失敗しました。');
+        }
+      };
+
+      // 残り日数の計算（今日を基準に）
+      const calculateRemainingDays = (end) => {
+        const today = new Date(getTodayStr());
+        const endDateObj = new Date(end);
+        const diffTime = endDateObj - today;
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        
+        if (diffDays < 0) return '服用終了';
+        if (diffDays === 0) return '今日まで';
+        return `あと ${diffDays} 日`;
+      };
+
+      return (
+        <div>
+          <header className="bg-teal-600 text-white p-4 shadow-md sticky top-0 z-10">
+            <div className="max-w-md mx-auto flex items-center justify-center gap-2">
+              <Activity size={24} />
+              <h1 className="text-xl font-bold tracking-wider">処方日数・終了日計算</h1>
+            </div>
+          </header>
+
+          <main className="max-w-md mx-auto p-4 space-y-6 mt-4">
+            
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+              <div className="bg-teal-50 p-4 border-b border-teal-100 flex items-center gap-2 text-teal-800">
+                <Activity size={20} />
+                <h2 className="font-semibold">いつまであるか計算</h2>
+              </div>
+              
+              <div className="p-5 space-y-5">
+                <div className="space-y-1">
+                  <label className="block text-sm font-medium text-slate-600">病院・医療機関名 (任意)</label>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                      <Building2 size={18} />
+                    </div>
+                    <input
+                      type="text"
+                      value={hospitalName}
+                      onChange={(e) => setHospitalName(e.target.value)}
+                      placeholder="例: A病院、近所のクリニック"
+                      className="w-full pl-10 pr-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition-colors"
+                    />
+                  </div>
                 </div>
-                <input
-                  type="text"
-                  value={hospitalName}
-                  onChange={(e) => setHospitalName(e.target.value)}
-                  placeholder="例: A病院、近所のクリニック"
-                  className="w-full pl-10 pr-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition-colors"
-                />
+
+                <div className="space-y-1">
+                  <label className="block text-sm font-medium text-slate-600">内服を開始する日</label>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                      <CalendarIcon size={18} />
+                    </div>
+                    <input
+                      type="date"
+                      value={startDate}
+                      onChange={(e) => setStartDate(e.target.value)}
+                      className="w-full pl-10 pr-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition-colors"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="block text-sm font-medium text-slate-600">処方日数 (何日分か)</label>
+                  <div className="relative flex items-center gap-2">
+                    <div className="relative flex-1">
+                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                        <CalendarDays size={18} />
+                      </div>
+                      <input
+                        type="number"
+                        min="1"
+                        value={days}
+                        onChange={(e) => setDays(parseInt(e.target.value) || '')}
+                        className="w-full pl-10 pr-8 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition-colors text-lg font-medium"
+                      />
+                      <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none text-slate-500">
+                        日分
+                      </div>
+                    </div>
+                    
+                    <div className="flex gap-1">
+                      {[14, 28, 30].map(d => (
+                        <button
+                          key={d}
+                          onClick={() => setDays(d)}
+                          className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm rounded-lg transition-colors border border-slate-200 font-medium"
+                        >
+                          {d}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-6 p-4 bg-gradient-to-br from-teal-500 to-teal-600 rounded-xl text-white shadow-inner">
+                  <p className="text-teal-100 text-sm mb-1 flex items-center gap-1">
+                    <Info size={14} />
+                    内服終了日（この日までお薬があります）
+                  </p>
+                  <div className="text-2xl font-bold text-center py-2">
+                    {endDate ? formatDateJP(endDate) : '---'}
+                  </div>
+                  {endDate && startDate && days > 0 && (
+                    <p className="text-center text-teal-100 text-sm mt-1">
+                      ({formatDateJP(startDate)} から {days} 日間)
+                    </p>
+                  )}
+                </div>
+
+                <button
+                  onClick={handleSave}
+                  disabled={!endDate}
+                  className="w-full py-3 bg-teal-600 hover:bg-teal-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white font-semibold rounded-lg shadow-sm transition-all flex items-center justify-center gap-2 active:scale-95"
+                >
+                  <Plus size={20} />
+                  計算結果をリストに追加
+                </button>
               </div>
             </div>
 
-            {/* 内服開始日入力 */}
-            <div className="space-y-1">
-              <label className="block text-sm font-medium text-slate-600">内服を開始する日</label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
-                  <CalendarIcon size={18} />
-                </div>
-                <input
-                  type="date"
-                  value={startDate}
-                  onChange={(e) => setStartDate(e.target.value)}
-                  className="w-full pl-10 pr-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition-colors"
-                />
-              </div>
-            </div>
-
-            {/* 処方日数入力 */}
-            <div className="space-y-1">
-              <label className="block text-sm font-medium text-slate-600">処方日数 (何日分か)</label>
-              <div className="relative flex items-center gap-2">
-                <div className="relative flex-1">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
-                    <CalendarDays size={18} />
-                  </div>
-                  <input
-                    type="number"
-                    min="1"
-                    value={days}
-                    onChange={(e) => setDays(parseInt(e.target.value) || '')}
-                    className="w-full pl-10 pr-8 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition-colors text-lg font-medium"
-                  />
-                  <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none text-slate-500">
-                    日分
-                  </div>
+            {records.length > 0 && (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between px-1">
+                  <h3 className="font-semibold text-slate-700 flex items-center gap-2">
+                    <Clock size={18} />
+                    保存した記録
+                  </h3>
+                  
+                  <button
+                    onClick={handleCopyText}
+                    className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                      isCopied 
+                        ? 'bg-green-100 text-green-700 border border-green-200' 
+                        : 'bg-white text-slate-600 border border-slate-300 hover:bg-slate-50'
+                    }`}
+                  >
+                    {isCopied ? (
+                      <>
+                        <Check size={16} /> コピーしました
+                      </>
+                    ) : (
+                      <>
+                        <Copy size={16} /> 記録をテキストでコピー
+                      </>
+                    )}
+                  </button>
                 </div>
                 
-                {/* クイック入力ボタン (14, 28, 30 に変更) */}
-                <div className="flex gap-1">
-                  {[14, 28, 30].map(d => (
-                    <button
-                      key={d}
-                      onClick={() => setDays(d)}
-                      className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm rounded-lg transition-colors border border-slate-200 font-medium"
-                    >
-                      {d}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
+                <div className="space-y-3">
+                  {records.map((record) => {
+                    const remaining = calculateRemainingDays(record.endDate);
+                    const isFinished = remaining === '服用終了';
 
-            {/* 計算結果表示エリア */}
-            <div className="mt-6 p-4 bg-gradient-to-br from-teal-500 to-teal-600 rounded-xl text-white shadow-inner">
-              <p className="text-teal-100 text-sm mb-1 flex items-center gap-1">
-                <Info size={14} />
-                内服終了日（この日までお薬があります）
-              </p>
-              <div className="text-2xl font-bold text-center py-2">
-                {endDate ? formatDateJP(endDate) : '---'}
-              </div>
-              {endDate && startDate && days > 0 && (
-                <p className="text-center text-teal-100 text-sm mt-1">
-                  ({formatDateJP(startDate)} から {days} 日間)
-                </p>
-              )}
-            </div>
-
-            {/* 保存ボタン */}
-            <button
-              onClick={handleSave}
-              disabled={!endDate}
-              className="w-full py-3 bg-teal-600 hover:bg-teal-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white font-semibold rounded-lg shadow-sm transition-all flex items-center justify-center gap-2 active:scale-95"
-            >
-              <Plus size={20} />
-              計算結果をリストに追加
-            </button>
-          </div>
-        </div>
-
-        {/* 履歴リスト */}
-        {records.length > 0 && (
-          <div className="space-y-4">
-            <div className="flex items-center justify-between px-1">
-              <h3 className="font-semibold text-slate-700 flex items-center gap-2">
-                <Clock size={18} />
-                保存した記録
-              </h3>
-              
-              {/* コピーボタン */}
-              <button
-                onClick={handleCopyText}
-                className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
-                  isCopied 
-                    ? 'bg-green-100 text-green-700 border border-green-200' 
-                    : 'bg-white text-slate-600 border border-slate-300 hover:bg-slate-50'
-                }`}
-              >
-                {isCopied ? (
-                  <>
-                    <Check size={16} /> コピーしました
-                  </>
-                ) : (
-                  <>
-                    <Copy size={16} /> 記録をテキストでコピー
-                  </>
-                )}
-              </button>
-            </div>
-            
-            <div className="space-y-3">
-              {records.map((record) => {
-                const remaining = calculateRemainingDays(record.endDate);
-                const isFinished = remaining === '服用終了';
-
-                return (
-                  <div 
-                    key={record.id} 
-                    className={`bg-white p-4 rounded-xl shadow-sm border ${isFinished ? 'border-slate-200 opacity-60' : 'border-teal-100'} relative overflow-hidden`}
-                  >
-                    {/* ステータスバッジ */}
-                    {!isFinished && (
-                      <div className="absolute top-0 right-0 bg-orange-100 text-orange-800 text-xs font-bold px-3 py-1 rounded-bl-lg">
-                        {remaining}
-                      </div>
-                    )}
-
-                    <div className="flex justify-between items-start mb-2 pr-16">
-                      <h4 className="font-bold text-lg text-slate-800 flex items-center gap-2">
-                        <Building2 size={16} className="text-teal-600" />
-                        <span className="line-clamp-1">{record.name}</span>
-                      </h4>
-                    </div>
-                    
-                    <div className="grid grid-cols-2 gap-2 text-sm text-slate-600 mb-3">
-                      <div>
-                        <span className="text-slate-400 text-xs block">開始日</span>
-                        {formatDateJP(record.startDate)}
-                      </div>
-                      <div>
-                        <span className="text-slate-400 text-xs block">処方日数</span>
-                        {record.days} 日分
-                      </div>
-                    </div>
-                    
-                    <div className="bg-slate-50 p-2 rounded border border-slate-100 flex items-center justify-between">
-                      <div>
-                        <span className="text-slate-400 text-xs block">終了日 (ここまで)</span>
-                        <span className={`font-semibold ${isFinished ? 'text-slate-500' : 'text-teal-700'}`}>
-                          {formatDateJP(record.endDate)}
-                        </span>
-                      </div>
-                      <button
-                        onClick={() => handleDelete(record.id)}
-                        className="p-2 text-slate-400 hover:text-red-500 transition-colors rounded-full hover:bg-red-50"
-                        title="削除"
+                    return (
+                      <div 
+                        key={record.id} 
+                        className={`bg-white p-4 rounded-xl shadow-sm border ${isFinished ? 'border-slate-200 opacity-60' : 'border-teal-100'} relative overflow-hidden`}
                       >
-                        <Trash2 size={18} />
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-            
-            {/* コピーされるテキストのプレビュー（確認用） */}
-            <div className="bg-slate-100 border border-slate-200 rounded-lg p-3 text-xs text-slate-500 mt-2">
-              <p className="font-semibold mb-1">【コピーされる文章のプレビュー】</p>
-              <div className="whitespace-pre-wrap font-mono">
-                【処方薬の終了日確認】{'\n'}
-                {records.map(record => (
-                  `・${record.name}からの処方 (${record.days}日分)： ${formatShortDate(record.startDate)}開始 → ${formatShortDate(record.endDate)}まで\n`
-                ))}
-              </div>
-            </div>
+                        {!isFinished && (
+                          <div className="absolute top-0 right-0 bg-orange-100 text-orange-800 text-xs font-bold px-3 py-1 rounded-bl-lg">
+                            {remaining}
+                          </div>
+                        )}
 
-          </div>
-        )}
-      </main>
-    </div>
-  );
-}
+                        <div className="flex justify-between items-start mb-2 pr-16">
+                          <h4 className="font-bold text-lg text-slate-800 flex items-center gap-2">
+                            <Building2 size={16} className="text-teal-600" />
+                            <span className="line-clamp-1">{record.name}</span>
+                          </h4>
+                        </div>
+                        
+                        <div className="grid grid-cols-2 gap-2 text-sm text-slate-600 mb-3">
+                          <div>
+                            <span className="text-slate-400 text-xs block">開始日</span>
+                            {formatDateJP(record.startDate)}
+                          </div>
+                          <div>
+                            <span className="text-slate-400 text-xs block">処方日数</span>
+                            {record.days} 日分
+                          </div>
+                        </div>
+                        
+                        <div className="bg-slate-50 p-2 rounded border border-slate-100 flex items-center justify-between">
+                          <div>
+                            <span className="text-slate-400 text-xs block">終了日 (ここまで)</span>
+                            <span className={`font-semibold ${isFinished ? 'text-slate-500' : 'text-teal-700'}`}>
+                              {formatDateJP(record.endDate)}
+                            </span>
+                          </div>
+                          <button
+                            onClick={() => handleDelete(record.id)}
+                            className="p-2 text-slate-400 hover:text-red-500 transition-colors rounded-full hover:bg-red-50"
+                            title="削除"
+                          >
+                            <Trash2 size={18} />
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+                
+                <div className="bg-slate-100 border border-slate-200 rounded-lg p-3 text-xs text-slate-500 mt-2">
+                  <p className="font-semibold mb-1">【コピーされる文章のプレビュー】</p>
+                  <div className="whitespace-pre-wrap font-mono">
+                    【処方薬の終了日確認】{'\n'}
+                    {records.map(record => (
+                      `・${record.name}からの処方 (${record.days}日分)： ${formatShortDate(record.startDate)}開始 → ${formatShortDate(record.endDate)}まで\n`
+                    ))}
+                  </div>
+                </div>
+
+              </div>
+            )}
+          </main>
+        </div>
+      );
+    }
+
+    // 画面に表示する処理
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
