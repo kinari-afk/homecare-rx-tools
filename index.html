@@ -47,6 +47,16 @@
       return `${yyyy}-${mm}-${dd}`;
     };
 
+    // ユーティリティ関数：明日の日付を YYYY-MM-DD 形式で取得
+    const getTomorrowStr = () => {
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      const yyyy = tomorrow.getFullYear();
+      const mm = String(tomorrow.getMonth() + 1).padStart(2, '0');
+      const dd = String(tomorrow.getDate()).padStart(2, '0');
+      return `${yyyy}-${mm}-${dd}`;
+    };
+
     // ユーティリティ関数：日付文字列を日本語表記にフォーマット (画面表示用)
     const formatDateJP = (dateString) => {
       if (!dateString) return '';
@@ -158,17 +168,13 @@
         }
       }, [startDate, days, timings, startTiming]);
 
-      // 残り日数の計算（今日を基準に）
-      const calculateRemainingDays = (end) => {
-        if (!end) return '';
+      // 残り日数の「数値」を計算（今日を基準に）
+      const getRemainingDaysNum = (end) => {
+        if (!end) return null;
         const today = new Date(getTodayStr());
         const endDateObj = new Date(end);
         const diffTime = endDateObj - today;
-        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-        
-        if (diffDays < 0) return '服用終了';
-        if (diffDays === 0) return '今日まで';
-        return `あと ${diffDays} 日`;
+        return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
       };
 
       // 計算結果を履歴に保存
@@ -204,16 +210,17 @@
         
         records.forEach(record => {
           const hName = record.name;
-          const sDate = formatShortDate(record.startDate);
           const eDate = formatShortDate(record.endDate);
-          const sTimeStr = record.startTiming ? ` ${getTimingLabel(record.startTiming)}` : '';
           const eTimeStr = record.endTiming ? ` ${getTimingLabel(record.endTiming)}` : '';
           
-          // 【改善】現在の残り日数をテキストに含める
-          const remaining = calculateRemainingDays(record.endDate);
-          const remainStr = remaining === '服用終了' ? '服用終了' : remaining;
+          // 現在の残り日数をテキストに含める
+          const diffDays = getRemainingDaysNum(record.endDate);
+          let remainStr = '';
+          if (diffDays < 0) remainStr = '服用終了';
+          else if (diffDays === 0) remainStr = '今日まで';
+          else remainStr = `あと ${diffDays} 日`;
           
-          copyText += `・${hName}からの処方 (${record.days}日分)： ${sDate}${sTimeStr}開始 → ${eDate}${eTimeStr}まで（${remainStr}）\n`;
+          copyText += `・${hName}からの処方 ： ${eDate}${eTimeStr}まで（${remainStr}）\n`;
         });
 
         try {
@@ -271,9 +278,27 @@
                   </div>
                 </div>
 
-                {/* 開始日 */}
+                {/* 開始日 (今日・明日ボタン追加) */}
                 <div className="space-y-1">
-                  <label className="block text-sm font-medium text-slate-600">内服を開始する日</label>
+                  <div className="flex justify-between items-end mb-1">
+                    <label className="block text-sm font-medium text-slate-600">内服を開始する日</label>
+                    <div className="flex gap-1.5">
+                      <button 
+                        type="button" 
+                        onClick={() => setStartDate(getTodayStr())}
+                        className="px-3 py-1 text-xs font-medium bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-md border border-slate-200 transition-colors"
+                      >
+                        今日から
+                      </button>
+                      <button 
+                        type="button" 
+                        onClick={() => setStartDate(getTomorrowStr())}
+                        className="px-3 py-1 text-xs font-medium bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-md border border-slate-200 transition-colors"
+                      >
+                        明日から
+                      </button>
+                    </div>
+                  </div>
                   <div className="flex items-center relative">
                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
                       <CalendarIcon size={18} />
@@ -453,8 +478,25 @@
                 
                 <div className="space-y-3">
                   {records.map((record) => {
-                    const remaining = calculateRemainingDays(record.endDate);
-                    const isFinished = remaining === '服用終了';
+                    const diffDays = getRemainingDaysNum(record.endDate);
+                    const isFinished = diffDays < 0;
+                    
+                    // アラートレベルに応じた色とテキストの判定
+                    let remainingText = '';
+                    let badgeClass = "bg-teal-100 text-teal-800 border-b border-l border-teal-200"; // 余裕あり（デフォルト緑）
+                    
+                    if (diffDays < 0) {
+                      remainingText = '服用終了';
+                      badgeClass = "bg-slate-100 text-slate-600 border-b border-l border-slate-200";
+                    } else if (diffDays === 0) {
+                      remainingText = '今日まで';
+                      badgeClass = "bg-red-100 text-red-800 border-b border-l border-red-200 font-extrabold"; // 警告（赤）
+                    } else {
+                      remainingText = `あと ${diffDays} 日`;
+                      if (diffDays <= 3) {
+                        badgeClass = "bg-orange-100 text-orange-800 border-b border-l border-orange-200 font-bold"; // 注意（オレンジ）
+                      }
+                    }
 
                     return (
                       <div 
@@ -462,8 +504,8 @@
                         className={`bg-white p-4 rounded-xl shadow-sm border ${isFinished ? 'border-slate-200 opacity-60' : 'border-teal-100'} relative overflow-hidden`}
                       >
                         {!isFinished && (
-                          <div className="absolute top-0 right-0 bg-orange-100 text-orange-800 text-xs font-bold px-3 py-1 rounded-bl-lg border-b border-l border-orange-200">
-                            {remaining}
+                          <div className={`absolute top-0 right-0 text-xs px-3 py-1 rounded-bl-lg ${badgeClass}`}>
+                            {remainingText}
                           </div>
                         )}
 
@@ -526,11 +568,15 @@
                   <div className="whitespace-pre-wrap font-mono leading-relaxed pl-1 border-l-2 border-slate-600">
                     【処方薬の終了日確認】 (確認日: {formatShortDate(getTodayStr())}){'\n'}
                     {records.map(record => {
-                      const sTimeStr = record.startTiming ? ` ${getTimingLabel(record.startTiming)}` : '';
                       const eTimeStr = record.endTiming ? ` ${getTimingLabel(record.endTiming)}` : '';
-                      const remaining = calculateRemainingDays(record.endDate);
-                      const remainStr = remaining === '服用終了' ? '服用終了' : remaining;
-                      return `・${record.name}からの処方 (${record.days}日分)： ${formatShortDate(record.startDate)}${sTimeStr}開始 → ${formatShortDate(record.endDate)}${eTimeStr}まで（${remainStr}）\n`;
+                      
+                      const diffDays = getRemainingDaysNum(record.endDate);
+                      let remainStr = '';
+                      if (diffDays < 0) remainStr = '服用終了';
+                      else if (diffDays === 0) remainStr = '今日まで';
+                      else remainStr = `あと ${diffDays} 日`;
+                      
+                      return `・${record.name}からの処方 ： ${formatShortDate(record.endDate)}${eTimeStr}まで（${remainStr}）\n`;
                     })}
                   </div>
                 </div>
